@@ -16,6 +16,7 @@ package transport
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -39,6 +40,10 @@ func New(reg name.Registry, auth authn.Authenticator, t http.RoundTripper, scope
 // authentication was already done prior to this call, so it just returns
 // the provided RoundTripper without further action
 func NewWithContext(ctx context.Context, reg name.Registry, auth authn.Authenticator, t http.RoundTripper, scopes []string) (http.RoundTripper, error) {
+
+	fmt.Printf("DEBUG TRANSPORT %s - %s\n", reg.RegistryStr(), reg.Scheme())
+	fmt.Printf("DEBUG TRANSPORT SCOPE %v\n", scopes)
+
 	// When the transport provided is of the type Wrapper this function assumes that the caller already
 	// executed the necessary login and check.
 	switch t.(type) {
@@ -66,6 +71,7 @@ func NewWithContext(ctx context.Context, reg name.Registry, auth authn.Authentic
 
 	// Wrap t with a useragent transport unless we already have one.
 	if _, ok := t.(*userAgentTransport); !ok {
+		fmt.Println("\nDEBUG WRAP TRANSPORT WITH USER AGENT\n")
 		t = NewUserAgent(t, "")
 	}
 
@@ -82,6 +88,7 @@ func NewWithContext(ctx context.Context, reg name.Registry, auth authn.Authentic
 	}
 
 	if strings.ToLower(pr.Scheme) != "bearer" {
+		fmt.Println("DEBUG RETURNING NOT bearer")
 		return &Wrapper{&basicTransport{inner: t, auth: auth, target: reg.RegistryStr()}}, nil
 	}
 

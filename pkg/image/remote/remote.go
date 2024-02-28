@@ -100,6 +100,7 @@ func RetrieveRemoteImage(image string, opts config.RegistryOptions, customPlatfo
 	}
 
 	logrus.Infof("Retrieving image %s from registry %s", ref, registryName)
+	// last log
 
 	retryFunc := func() (v1.Image, error) {
 		return remoteImageFunc(ref, remoteOptions(registryName, opts, customPlatform)...)

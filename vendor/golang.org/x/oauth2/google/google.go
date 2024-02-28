@@ -277,10 +277,16 @@ func (cs computeSource) Token() (*oauth2.Token, error) {
 		v.Set("scopes", strings.Join(cs.scopes, ","))
 		tokenURI = tokenURI + "?" + v.Encode()
 	}
+
+	fmt.Printf("\nDEBUG TOKEN uri %s\n", tokenURI)
+
 	tokenJSON, err := metadata.Get(tokenURI)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("DEBUG TOKEN json %s\n", tokenJSON)
+
 	var res struct {
 		AccessToken  string `json:"access_token"`
 		ExpiresInSec int    `json:"expires_in"`

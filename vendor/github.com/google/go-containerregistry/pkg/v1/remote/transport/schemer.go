@@ -15,6 +15,7 @@
 package transport
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/google/go-containerregistry/pkg/name"
@@ -38,6 +39,7 @@ func (st *schemeTransport) RoundTrip(in *http.Request) (*http.Response, error) {
 	// registry server and not e.g. a separate token server or blob storage,
 	// so we should only override the scheme if the host is the registry.
 	if matchesHost(st.registry.String(), in, st.scheme) {
+		fmt.Printf("\nDEBUG ADDING SCHEME %s\n", st.scheme)
 		in.URL.Scheme = st.scheme
 	}
 	return st.inner.RoundTrip(in)

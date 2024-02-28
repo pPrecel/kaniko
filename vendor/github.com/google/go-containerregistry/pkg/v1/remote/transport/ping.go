@@ -64,10 +64,25 @@ func pingSingle(ctx context.Context, reg name.Registry, t http.RoundTripper, sch
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("\nDEBUG request to %s\n", url)
+	for key := range req.Header {
+		fmt.Printf("DEBUG request header %s - %s\n", key, req.Header.Get(key))
+	}
+
 	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
+		fmt.Printf("DEBUG refresh err '%s'", err.Error())
 		return nil, err
 	}
+	fmt.Printf("DEBUG response %+v\n", resp)
+	for key := range resp.Header {
+		fmt.Printf("DEBUG response header %s - %s\n", key, resp.Header.Get(key))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	fmt.Printf("DEBUG response err '%s', body '%s'\n", err, string(body))
+
 	defer func() {
 		// By draining the body, make sure to reuse the connection made by
 		// the ping for the following access to the registry
@@ -80,24 +95,30 @@ func pingSingle(ctx context.Context, reg name.Registry, t http.RoundTripper, sch
 	switch resp.StatusCode {
 	case http.StatusOK:
 		// If we get a 200, then no authentication is needed.
-		return &Challenge{
+		ch := Challenge{
 			Insecure: insecure,
-		}, nil
+		}
+		fmt.Printf("DEBUG returning challenge '%+v'\n", ch)
+		return &ch, nil
 	case http.StatusUnauthorized:
 		if challenges := authchallenge.ResponseChallenges(resp); len(challenges) != 0 {
 			// If we hit more than one, let's try to find one that we know how to handle.
 			wac := pickFromMultipleChallenges(challenges)
-			return &Challenge{
+			ch := Challenge{
 				Scheme:     wac.Scheme,
 				Parameters: wac.Parameters,
 				Insecure:   insecure,
-			}, nil
+			}
+			fmt.Printf("DEBUG returning challenge '%+v'\n", ch)
+			return &ch, nil
 		}
 		// Otherwise, just return the challenge without parameters.
-		return &Challenge{
+		ch := Challenge{
 			Scheme:   resp.Header.Get("WWW-Authenticate"),
 			Insecure: insecure,
-		}, nil
+		}
+		fmt.Printf("DEBUG returning challenge '%+v'\n", ch)
+		return &ch, nil
 	default:
 		return nil, CheckError(resp, http.StatusOK, http.StatusUnauthorized)
 	}

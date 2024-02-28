@@ -15,6 +15,7 @@
 package google
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -68,12 +69,16 @@ func resolve() authn.Authenticator {
 	auth, envErr := NewEnvAuthenticator()
 	if envErr == nil && auth != authn.Anonymous {
 		logs.Debug.Println("google.Keychain: using Application Default Credentials")
+		aauth, err := auth.Authorization()
+		fmt.Printf("\nDEBUG keuchain env config %+v, err %s\n", aauth, err)
 		return auth
 	}
 
 	auth, gErr := NewGcloudAuthenticator()
 	if gErr == nil && auth != authn.Anonymous {
 		logs.Debug.Println("google.Keychain: using gcloud fallback")
+		aauth, err := auth.Authorization()
+		fmt.Printf("\nDEBUG keuchain gcloud config %+v, err %s\n", aauth, err)
 		return auth
 	}
 

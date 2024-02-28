@@ -45,14 +45,18 @@ func (bt *basicTransport) RoundTrip(in *http.Request) (*http.Response, error) {
 		// In case of redirect http.Client can use an empty Host, check URL too.
 		if in.Host == bt.target || in.URL.Host == bt.target {
 			if bearer := auth.RegistryToken; bearer != "" {
+				fmt.Printf("\nDEBUG adding Bearer %s\n", bearer)
 				hdr := fmt.Sprintf("Bearer %s", bearer)
 				in.Header.Set("Authorization", hdr)
 			} else if user, pass := auth.Username, auth.Password; user != "" && pass != "" {
 				delimited := fmt.Sprintf("%s:%s", user, pass)
 				encoded := base64.StdEncoding.EncodeToString([]byte(delimited))
+				fmt.Printf("\nDEBUG adding encoded Basic %s\n", encoded)
+				// TODO: here is problem... this header should not be added to the outgoing request
 				hdr := fmt.Sprintf("Basic %s", encoded)
 				in.Header.Set("Authorization", hdr)
 			} else if token := auth.Auth; token != "" {
+				fmt.Printf("\nDEBUG adding Basic %s\n", token)
 				hdr := fmt.Sprintf("Basic %s", token)
 				in.Header.Set("Authorization", hdr)
 			}

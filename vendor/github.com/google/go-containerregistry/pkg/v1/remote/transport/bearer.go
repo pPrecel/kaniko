@@ -86,7 +86,8 @@ func fromChallenge(reg name.Registry, auth authn.Authenticator, t http.RoundTrip
 	if pr.Insecure {
 		scheme = "http"
 	}
-	return &bearerTransport{
+
+	bt := bearerTransport{
 		inner:    t,
 		basic:    auth,
 		realm:    realm,
@@ -94,7 +95,11 @@ func fromChallenge(reg name.Registry, auth authn.Authenticator, t http.RoundTrip
 		service:  service,
 		scopes:   scopes,
 		scheme:   scheme,
-	}, nil
+	}
+
+	fmt.Printf("\nDEBUG bearer transport '%+v'\n", bt)
+
+	return &bt, nil
 }
 
 type bearerTransport struct {
@@ -139,19 +144,28 @@ func (bt *bearerTransport) RoundTrip(in *http.Request) (*http.Response, error) {
 		// the registry with which we are interacting.
 		// In case of redirect http.Client can use an empty Host, check URL too.
 		if matchesHost(bt.registry.RegistryStr(), in, bt.scheme) {
+			fmt.Printf("DEBUG ADDING Bearer %s\n", bt.bearer.RegistryToken)
 			hdr := fmt.Sprintf("Bearer %s", bt.bearer.RegistryToken)
 			in.Header.Set("Authorization", hdr)
 		}
+
+		fmt.Printf("DEBUG request %+v", in)
+
 		return bt.inner.RoundTrip(in)
 	}
 
 	res, err := sendRequest()
 	if err != nil {
+		fmt.Printf("\nDEBUG ERROR %s\n", err.Error())
 		return nil, err
 	}
+	fmt.Printf("\nDEBUG res %+v\n", res)
+	// body, err := io.ReadAll(res.Body)
+	// fmt.Printf("DEBUG err %s, body %s\n", err, string(body))
 
 	// If we hit a WWW-Authenticate challenge, it might be due to expired tokens or insufficient scope.
 	if challenges := authchallenge.ResponseChallenges(res); len(challenges) != 0 {
+		fmt.Println("DEBUG HIT WWW-Authenticate challenge")
 		// close out old response, since we will not return it.
 		res.Body.Close()
 
@@ -196,6 +210,7 @@ func (bt *bearerTransport) refresh(ctx context.Context) error {
 	}
 
 	if auth.RegistryToken != "" {
+		fmt.Printf("DEBUG fresh setting baerer '%s'\n", auth.RegistryToken)
 		bt.bearer.RegistryToken = auth.RegistryToken
 		return nil
 	}
@@ -207,11 +222,13 @@ func (bt *bearerTransport) refresh(ctx context.Context) error {
 
 	// Some registries set access_token instead of token. See #54.
 	if response.AccessToken != "" {
+		fmt.Printf("DEBUG token as AccessToken '%s'\n", response.AccessToken)
 		response.Token = response.AccessToken
 	}
 
 	// Find a token to turn into a Bearer authenticator
 	if response.Token != "" {
+		fmt.Printf("DEBUG setting baerer from response '%s'\n", response.Token)
 		bt.bearer.RegistryToken = response.Token
 	}
 
@@ -231,6 +248,7 @@ func (bt *bearerTransport) Refresh(ctx context.Context, auth *authn.AuthConfig) 
 		err     error
 	)
 	if auth.IdentityToken != "" {
+		fmt.Println("DEBUG IdentityToken != ''")
 		// If the secret being stored is an identity token,
 		// the Username should be set to <token>, which indicates
 		// we are using an oauth flow.
@@ -243,6 +261,7 @@ func (bt *bearerTransport) Refresh(ctx context.Context, auth *authn.AuthConfig) 
 			content, err = bt.refreshBasic(ctx)
 		}
 	} else {
+		fmt.Println("DEBUG IdentityToken == ''")
 		content, err = bt.refreshBasic(ctx)
 	}
 	if err != nil {
@@ -253,6 +272,8 @@ func (bt *bearerTransport) Refresh(ctx context.Context, auth *authn.AuthConfig) 
 	if err := json.Unmarshal(content, &response); err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("DEBUG got response %+v\n", response)
 
 	if response.Token == "" && response.AccessToken == "" {
 		return &response, fmt.Errorf("no token in bearer response:\n%s", content)
@@ -332,6 +353,12 @@ func (bt *bearerTransport) refreshOauth(ctx context.Context) ([]byte, error) {
 	// We don't want to log credentials.
 	ctx = redact.NewContext(ctx, "oauth token response contains credentials")
 
+	fmt.Printf("DEBUG refresh oauth url '%s'\n", u.String())
+	fmt.Printf("DEBUG refresh params '%s'\n", v.Encode())
+	for key := range req.Header {
+		fmt.Printf("DEBUG refresh header '%s-%s'\n", key, req.Header.Get(key))
+	}
+
 	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
@@ -360,6 +387,7 @@ func (bt *bearerTransport) refreshBasic(ctx context.Context) ([]byte, error) {
 		target: u.Host,
 	}
 	client := http.Client{Transport: b}
+	// client := http.Client{Transport: http.DefaultTransport}
 
 	v := u.Query()
 	v["scope"] = bt.scopes
@@ -369,6 +397,12 @@ func (bt *bearerTransport) refreshBasic(ctx context.Context) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	fmt.Printf("DEBUG refresh url '%s'\n", u.String())
+	fmt.Printf("DEBUG refresh params '%s'\n", v.Encode())
+	for key := range req.Header {
+		fmt.Printf("DEBUG refresh header '%s-%s'\n", key, req.Header.Get(key))
 	}
 
 	// We don't want to log credentials.

@@ -208,6 +208,8 @@ func FindDefaultCredentialsWithParams(ctx context.Context, params CredentialsPar
 	// Make defensive copy of the slices in params.
 	params = params.deepCopy()
 
+	fmt.Printf("\nDEBUG ENVIRON: %+v", os.Environ())
+
 	// First, try the environment variable.
 	const envVar = "GOOGLE_APPLICATION_CREDENTIALS"
 	if filename := os.Getenv(envVar); filename != "" {
@@ -215,34 +217,45 @@ func FindDefaultCredentialsWithParams(ctx context.Context, params CredentialsPar
 		if err != nil {
 			return nil, fmt.Errorf("google: error getting credentials using %v environment variable: %v", envVar, err)
 		}
+
+		fmt.Printf("DEBUG returning env creds %+v\n", *creds)
 		return creds, nil
 	}
 
 	// Second, try a well-known file.
 	filename := wellKnownFile()
 	if b, err := os.ReadFile(filename); err == nil {
-		return CredentialsFromJSONWithParams(ctx, b, params)
+		creds, err := CredentialsFromJSONWithParams(ctx, b, params)
+		fmt.Printf("DEBUG returning well-known file creds %+v\n", *creds)
+		return creds, err
 	}
 
 	// Third, if we're on a Google App Engine standard first generation runtime (<= Go 1.9)
 	// use those credentials. App Engine standard second generation runtimes (>= Go 1.11)
 	// and App Engine flexible use ComputeTokenSource and the metadata server.
 	if appengineTokenFunc != nil {
-		return &Credentials{
+		creds := Credentials{
 			ProjectID:   appengineAppIDFunc(ctx),
 			TokenSource: AppEngineTokenSource(ctx, params.Scopes...),
-		}, nil
+		}
+		fmt.Printf("\nDEBUG returning appengineToken creds %+v\n", creds)
+		return &creds, nil
 	}
 
 	// Fourth, if we're on Google Compute Engine, an App Engine standard second generation runtime,
 	// or App Engine flexible, use the metadata server.
 	if metadata.OnGCE() {
 		id, _ := metadata.ProjectID()
-		return &Credentials{
+		creds := Credentials{
 			ProjectID:      id,
 			TokenSource:    computeTokenSource("", params.EarlyTokenRefresh, params.Scopes...),
 			universeDomain: params.UniverseDomain,
-		}, nil
+		}
+		fmt.Printf("\nDEBUG returning metadata.OnGCE creds %+v\n", creds)
+		fmt.Printf("DEBUG params %+v\n", params)
+		t, err := creds.TokenSource.Token()
+		fmt.Printf("DEBUG returning metadata token '%+v', err %s\n", t, err)
+		return &creds, nil
 	}
 
 	// None are found; return helpful error.

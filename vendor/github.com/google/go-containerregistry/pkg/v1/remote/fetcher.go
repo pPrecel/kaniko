@@ -63,6 +63,7 @@ func makeFetcher(ctx context.Context, target resource, o *options) (*fetcher, er
 		reg = repo.Registry
 	}
 
+	fmt.Println("DEBUG creating fetcher")
 	tr, err := transport.NewWithContext(ctx, reg, auth, o.transport, []string{target.Scope(transport.PullScope)})
 	if err != nil {
 		return nil, err
@@ -125,6 +126,11 @@ func (f *fetcher) fetchManifest(ctx context.Context, ref name.Reference, accepta
 		accept = append(accept, string(mt))
 	}
 	req.Header.Set("Accept", strings.Join(accept, ","))
+
+	fmt.Printf("DEBUG URL: %s\n", u.String())
+	for key := range req.Header {
+		fmt.Printf("DEBUG HEADER %s - %s\n", key, req.Header.Get(key))
+	}
 
 	resp, err := f.client.Do(req.WithContext(ctx))
 	if err != nil {

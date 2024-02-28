@@ -80,9 +80,12 @@ func init() {
 }
 
 func MakeTransport(opts config.RegistryOptions, registryName string) (http.RoundTripper, error) {
+	fmt.Printf("DEBUG BUILD TRANSPORT %s\n%+v\n", registryName, opts)
+
 	// Create a transport to set our user-agent.
 	var tr http.RoundTripper = http.DefaultTransport.(*http.Transport).Clone()
 	if opts.SkipTLSVerify || opts.SkipTLSVerifyRegistries.Contains(registryName) {
+		fmt.Println("DEBUG SET InsecureSkipVerify=true")
 		tr.(*http.Transport).TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 		}
@@ -90,6 +93,13 @@ func MakeTransport(opts config.RegistryOptions, registryName string) (http.Round
 		if err := systemCertLoader.append(certificatePath); err != nil {
 			return nil, fmt.Errorf("failed to load certificate %s for %s: %w", certificatePath, registryName, err)
 		}
+
+		fmt.Println("DEBUG SET RootCAs")
+		s := systemCertLoader.value().Subjects()
+		for i := range s {
+			fmt.Println(string(s[i]))
+		}
+
 		tr.(*http.Transport).TLSClientConfig = &tls.Config{
 			RootCAs: systemCertLoader.value(),
 		}
@@ -104,8 +114,14 @@ func MakeTransport(opts config.RegistryOptions, registryName string) (http.Round
 		if err != nil {
 			return nil, fmt.Errorf("failed to load client certificate/key '%s' for %s: %w", clientCertificatePath, registryName, err)
 		}
+		fmt.Println("DEBUG SET Certificates")
+		for i := range cert.Certificate {
+			fmt.Println(string(cert.Certificate[i]))
+		}
+
 		tr.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{cert}
 	}
 
+	fmt.Printf("DEBUG BUILD TRANSPORT %+v\n", tr)
 	return tr, nil
 }

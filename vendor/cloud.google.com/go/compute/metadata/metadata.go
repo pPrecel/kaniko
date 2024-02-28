@@ -316,6 +316,10 @@ func (c *Client) getETag(suffix string) (value, etag string, err error) {
 	var reqErr error
 	retryer := newRetryer()
 	for {
+		fmt.Printf("\nDEBUG metadata req %+v\n", req)
+		for key := range req.Header {
+			fmt.Printf("DEBUG metadata header %s - %s\n", key, req.Header.Get(key))
+		}
 		res, reqErr = c.hc.Do(req)
 		var code int
 		if res != nil {
